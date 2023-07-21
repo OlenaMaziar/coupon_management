@@ -1,0 +1,493 @@
+<?php
+
+/**
+ * Implements hook_entity_info().
+ */
+function tp_coupon_management_entity_info() {
+  $info['tp_coupon_management_coupon'] = array(
+    'label' => t('Coupon'),
+    'controller class' => 'EntityCouponController',
+    'base table' => 'tp_coupon_management_coupon',
+    'uri callback' => 'tp_coupon_management_coupon_uri',
+    'fieldable' => TRUE,
+    'entity keys' => array(
+      'id' => 'coupon_id' ,
+      'bundle' => 'bundle_type',
+    ),
+    'bundle keys' => array(
+      'bundle' => 'bundle_type',
+    ),
+    'static cache' => TRUE,
+    'bundles' => array(
+      'coupon_bundle' => array(
+        'label' => 'Coupon bundle',
+        'admin' => array(
+          'path' => 'admin/structure/tp_coupon_management_coupon/manage',
+          'access arguments' => array('administer tp_coupon_management_coupon entities'),
+        ),
+      ),
+    ),
+    'view modes' => array(
+      'tweaky' => array(
+        'label' => t('Tweaky'),
+        'custom settings' => FALSE,
+      ),
+    ),
+  );
+
+  return $info;
+}
+
+/**
+ * Fetch a coupon object.
+ */
+function tp_coupon_management_coupon_load($coupon_id = NULL, $reset = FALSE) {
+  $coupon_ids = (isset($coupon_id) ? array($coupon_id) : array());
+  $coupon = tp_coupon_management_coupon_load_multiple($coupon_ids, array(), $reset);
+  return $coupon ? reset($coupon) : FALSE;
+}
+
+/**
+ * Loads multiple coupon entities.
+ */
+function tp_coupon_management_coupon_load_multiple($coupon_ids = FALSE, $conditions = array(), $reset = FALSE) {
+  return entity_load('tp_coupon_management_coupon', $coupon_ids, $conditions, $reset);
+}
+
+/**
+ * Implements the uri callback.
+ */
+function tp_coupon_management_coupon_uri($coupon) {
+  return array(
+    'path' => 'tp_coupon_management/coupon/' . $coupon->coupon_id,
+  );
+}
+
+/**
+ * Implements hook_menu().
+ */
+function tp_coupon_management_menu() {
+  $items['tp_coupon_management'] = array(
+    'title' => 'List of coupons',
+    'page callback' => 'tp_coupon_management_info_page',
+    'access arguments' => array('view any tp_coupon_management_coupon entity'),
+  );
+
+  $items['admin/structure/tp_coupon_management_coupon/manage'] = array(
+    'title' => 'Administer tp_coupon_management_coupon entity type',
+    'page callback' => 'tp_coupon_management_coupon_list_entities',
+    'access arguments' => array('administer tp_coupon_management_coupon entities'),
+  );
+
+  $items['admin/structure/tp_coupon_management_coupon/manage/add'] = array(
+    'title' => 'Add a coupon',
+    'page callback' => 'tp_coupon_management_coupon_add',
+    'access arguments' => array('create tp_coupon_management_coupon entities'),
+    'type' => MENU_LOCAL_ACTION,
+  );
+
+  $items['admin/structure/tp_coupon_management_coupon/manage/list'] = array(
+    'title' => 'List',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+  );
+
+  $items['tp_coupon_management/coupon/%tp_coupon_management_coupon'] = array(
+    'title callback' => 'tp_coupon_management_coupon_title',
+    'title arguments' => array(2),
+    'page callback' => 'tp_coupon_management_coupon_view',
+    'page arguments' => array(2),
+    'access arguments' => array('view any tp_coupon_management_coupon entity'),
+  );
+
+  $items['tp_coupon_management/coupon/%tp_coupon_management_coupon/view'] = array(
+    'title' => 'View',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => -10,
+  );
+
+  $items['tp_coupon_management/coupon/%tp_coupon_management_coupon/edit'] = array(
+    'title' => 'Edit',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('tp_coupon_management_coupon_form', 2),
+    'access arguments' => array('edit any tp_coupon_management_coupon entity'),
+    'type' => MENU_LOCAL_TASK,
+  );
+
+  $items['tp_coupon_management/coupon/add'] = array(
+    'title' => 'Add a coupon',
+    'page callback' => 'tp_coupon_management_coupon_add',
+    'access arguments' => array('create tp_coupon_management_coupon entities'),
+  );
+
+  return $items;
+}
+
+/**
+ * Coupon information for the page.
+ */
+function tp_coupon_management_info_page() {
+  $content['preface'] = array(
+    '#type' => 'item',
+    '#markup' => t('The coupon management provides a Coupon Entity.'),
+  );
+  if (user_access('administer tp_coupon_management_coupon entities')) {
+    $content['preface']['#markup'] = t('You can administer these and add fields and change the view !link.',
+      array('!link' => l(t('here'), 'admin/structure/tp_coupon_management_coupon/manage'))
+    );
+  }
+  $content['table'] = tp_coupon_management_coupon_list_entities();
+
+  return $content;
+}
+
+/**
+ * Implements hook_permission().
+ */
+function tp_coupon_management_permission() {
+  $permissions = array(
+    'administer tp_coupon_management_coupon entities' => array(
+      'title' => t('Administer coupon entities'),
+    ),
+    'view any tp_coupon_management_coupon entity' => array(
+      'title' => t('View any coupon entity'),
+    ),
+    'edit any tp_coupon_management_coupon entity' => array(
+      'title' => t('Edit any coupon entity'),
+    ),
+    'create tp_coupon_management_coupon entities' => array(
+      'title' => t('Create coupon Entities'),
+    ),
+  );
+  return $permissions;
+}
+
+/**
+ * Returns a render array with all tp_coupon_management_coupon entities.
+ */
+function tp_coupon_management_coupon_list_entities() {
+  $content = array();
+  $headers = array(
+    t('ID'),
+    t('Coupon description'),
+    t('Coupon code'),
+    t('Discount percentage'),
+    t('Status'),
+    t('Operations'));
+  $query = db_select('tp_coupon_management_coupon', 'tcmc');
+  $query = $query->extend('TableSort')->orderByHeader($headers);
+  $result = $query->fields('tcmc', array('coupon_id', 'coupon_description', 'coupon_code', 'discount_percentage', 'status'))
+    ->execute();
+
+  $rows = array();
+  if(!empty($result)) {
+    foreach ($result as $coupons) {
+      $rows[$coupons->coupon_id] = array(
+        'id' => $coupons->coupon_id,
+        'coupon_description' => $coupons->coupon_description,
+        'coupon_code' => $coupons->coupon_code,
+        'discount_percentage' => $coupons->discount_percentage,
+        'status' => $coupons->status,
+        'ops' => l('edit', 'tp_coupon_management/coupon/' . $coupons->coupon_id . '/edit'),
+      );
+    }
+
+    $content['list_coupons'] = array(
+      '#markup' => theme('table', array(
+        'header' => $headers,
+        'rows' => $rows,
+        '#empty' =>t('No coupons currently exist.'),
+      ))
+    );
+  }
+  else {
+    $content[] = array(
+      '#type' => 'item',
+      '#markup' => t('No coupons currently exist.'),
+    );
+  }
+
+  return $content;
+}
+
+/**
+ * Callback for a page title when this entity is displayed.
+ */
+function tp_coupon_management_coupon_title($entity) {
+  return t('Coupon (title=@coupon_description)', array('@coupon_description' => $entity->coupon_description));
+}
+
+/**
+ * Menu callback to display an entity.
+ */
+function tp_coupon_management_coupon_view($entity, $view_mode = 'tweaky') {
+  $entity_type = 'tp_coupon_management_coupon';
+  $entity->content = array(
+    '#view_mode' => $view_mode,
+  );
+  field_attach_prepare_view($entity_type, array($entity->coupon_id => $entity),
+    $view_mode);
+  entity_prepare_view($entity_type, array($entity->coupon_id => $entity));
+  $entity->content += field_attach_view($entity_type, $entity, $view_mode);
+  $entity->content['coupon_description'] = array(
+    '#type' => 'item',
+    '#title' => t('Coupon description'),
+    '#markup' => $entity->coupon_description,
+  );
+  $entity->content['coupon_code'] = array(
+    '#type' => 'item',
+    '#title' => t('Coupon code'),
+    '#markup' => $entity->coupon_code,
+  );
+  $entity->content['discount_percentage'] = array(
+    '#type' => 'item',
+    '#title' => t('Discount percentage'),
+    '#markup' => $entity->discount_percentage,
+  );
+
+  global $language;
+  $langcode = $language->language;
+  module_invoke_all('entity_view', $entity, $entity_type, $view_mode,
+    $langcode);
+  drupal_alter(array('tp_coupon_management_coupon_view', 'entity_view'),
+    $entity->content, $entity_type);
+
+  return $entity->content;
+}
+
+/**
+ * Implements hook_field_extra_fields().
+ */
+function tp_coupon_management_field_extra_fields() {
+  $form_elements['coupon_description'] = array(
+    'label' => t('Coupon Description'),
+    'description' => t('Coupon Description (an extra form field)'),
+    'weight' => -5,
+  );
+  $display_elements['coupon_code'] = array(
+    'label' => t('Coupon code'),
+    'description' => t('Coupon code (an extra display field)'),
+    'weight' => 0,
+  );
+  $display_elements['discount_percentage'] = array(
+    'label' => t('Discount percentage'),
+    'description' => t('Discount percentage'),
+    'weight' => 0,
+  );
+
+  $extra_fields['tp_coupon_management_coupon']['coupon_bundle']['form'] = $form_elements;
+  $extra_fields['tp_coupon_management_coupon']['coupon_bundle']['display'] = $display_elements;
+
+  return $extra_fields;
+}
+
+/**
+ * Provides a wrapper on the edit form to add a new entity.
+ */
+function tp_coupon_management_coupon_add() {
+  $entity = entity_get_controller('tp_coupon_management_coupon')->create();
+  return drupal_get_form('tp_coupon_management_coupon_form', $entity);
+}
+
+/**
+ * Form function to create tp_coupon_management_coupon entity.
+ */
+function tp_coupon_management_coupon_form($form, &$form_state, $entity) {
+  $form['coupon_description'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Coupon Description'),
+    '#default_value' => isset($entity->coupon_description) ? $entity->coupon_description : '',
+  );
+  $form['coupon_code'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Coupon code'),
+    '#required' => TRUE,
+    '#default_value' => isset($entity->coupon_code) ? $entity->coupon_code : '',
+    '#attributes' => array('readonly' => 'readonly'),
+  );
+  $form['generate_coupon_code'] = array(
+    '#type' => 'button',
+    '#button_type' => 'button',
+    '#input' => TRUE,
+    '#value' => t('Generate coupon code'),
+    '#attached' => array(
+      'js' => array(drupal_get_path('module', 'tp_coupon_management') . '/coupon_code.js'),
+    ),
+  );
+  $form['discount_percentage'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Discount percentage'),
+    '#required' => TRUE,
+    '#default_value' => isset($entity->discount_percentage) ? $entity->discount_percentage : '',
+  );
+
+  $form['coupon_entity'] = array(
+    '#type' => 'value',
+    '#value' => $entity,
+  );
+
+  field_attach_form('tp_coupon_management_coupon', $entity, $form, $form_state);
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save'),
+    '#weight' => 100,
+  );
+  $form['delete'] = array(
+    '#type' => 'submit',
+    '#value' => t('Delete'),
+    '#submit' => array('tp_coupon_management_coupon_edit_delete'),
+    '#weight' => 200,
+  );
+
+  return $form;
+}
+
+
+/**
+ * Validation handler for tp_coupon_management_coupon_add_form form.
+ */
+function tp_coupon_management_coupon_form_validate($form, &$form_state) {
+  field_attach_form_validate('tp_coupon_management_coupon', $form_state['values']['coupon_entity'], $form, $form_state);
+}
+
+
+/**
+ * Form submit handler: Submits coupon_add_form information.
+ */
+function tp_coupon_management_coupon_form_submit($form, &$form_state) {
+  $entity = $form_state['values']['coupon_entity'];
+  $entity->coupon_description = $form_state['values']['coupon_description'];
+  $entity->coupon_code = $form_state['values']['coupon_code'];
+  $entity->discount_percentage = $form_state['values']['discount_percentage'];
+  field_attach_submit('tp_coupon_management_coupon', $entity, $form, $form_state);
+  $entity = tp_coupon_management_coupon_save($entity);
+  $form_state['redirect'] = 'tp_coupon_management/coupon/' . $entity->coupon_id;
+}
+
+/**
+ * Form deletion handler.
+ */
+function tp_coupon_management_coupon_edit_delete($form, &$form_state) {
+  $entity = $form_state['values']['coupon_entity'];
+  tp_coupon_management_coupon_delete($entity);
+  drupal_set_message(t('The entity %coupon_description (ID %id) has been deleted',
+    array('%coupon_description' => $entity->coupon_description, '%id' => $entity->coupon_id))
+  );
+  $form_state['redirect'] = 'tp_coupon_management';
+}
+
+/**
+ * Save the entity by calling the controller.
+ */
+function tp_coupon_management_coupon_save(&$entity) {
+  return entity_get_controller('tp_coupon_management_coupon')->save($entity);
+}
+
+/**
+ * Use the controller to delete the entity.
+ */
+function tp_coupon_management_coupon_delete($entity) {
+  entity_get_controller('tp_coupon_management_coupon')->delete($entity);
+}
+
+/**
+ * EntityCouponControllerInterface definition.
+ */
+interface EntityCouponControllerInterface extends DrupalEntityControllerInterface {
+
+  /**
+   * Create an entity.
+   */
+  public function create();
+
+  /**
+   * Save an entity.
+   *
+   * @param object $entity
+   *   The entity to save.
+   */
+  public function save($entity);
+
+  /**
+   * Delete an entity.
+   *
+   * @param object $entity
+   *   The entity to delete.
+   */
+  public function delete($entity);
+
+}
+
+/**
+ * EntityCouponController extends DrupalDefaultEntityController.
+ */
+class EntityCouponController extends DrupalDefaultEntityController implements EntityCouponControllerInterface {
+
+  /**
+   * Create and return a new tp_coupon_management_coupon entity.
+   */
+  public function create() {
+    $entity = new stdClass();
+    $entity->type = 'tp_coupon_management_coupon';
+    $entity->coupon_id = 0;
+    $entity->bundle_type = 'coupon_bundle';
+    $entity->coupon_code = '';
+    $entity->discount_percentage = '';
+    $entity->coupon_description = '';
+    $entity->status = '';
+
+    return $entity;
+  }
+
+  /**
+   * Saves the custom fields using drupal_write_record().
+   */
+  public function save($entity) {
+    module_invoke_all('entity_presave', $entity, 'tp_coupon_management_coupon');
+    $primary_keys = $entity->coupon_id ? 'coupon_id' : array();
+    drupal_write_record('tp_coupon_management_coupon', $entity, $primary_keys);
+    $invocation = 'entity_insert';
+    if (empty($primary_keys)) {
+      field_attach_insert('tp_coupon_management_coupon', $entity);
+    }
+    else {
+      field_attach_update('tp_coupon_management_coupon', $entity);
+      $invocation = 'entity_update';
+    }
+    module_invoke_all($invocation, $entity, 'tp_coupon_management_coupon');
+    return $entity;
+  }
+
+  /**
+   * Delete a single entity.
+   */
+  public function delete($entity) {
+    $this->deleteMultiple(array($entity));
+  }
+
+  /**
+   * Delete one or more tp_coupon_management_coupon entities.
+   */
+  public function deleteMultiple($entities) {
+    $coupon_ids = array();
+    if (!empty($entities)) {
+      $transaction = db_transaction();
+      try {
+        foreach ($entities as $entity) {
+          // Invoke hook_entity_delete().
+          module_invoke_all('entity_delete', $entity, 'tp_coupon_management_coupon');
+          field_attach_delete('tp_coupon_management_coupon', $entity);
+          $coupon_ids[] = $entity->coupon_id;
+        }
+        db_delete('tp_coupon_management_coupon')
+          ->condition('coupon_id', $coupon_ids, 'IN')
+          ->execute();
+      }
+      catch (Exception $e) {
+        $transaction->rollback();
+        watchdog_exception('tp_coupon_management', $e);
+        throw $e;
+      }
+    }
+  }
+}

@@ -1,0 +1,6 @@
+name = Coupons management
+description = Coupons management system allows to use discount system more flexible.
+core = 7.x
+package = Custom Module Package
+
+dependencies[] = drupal:field

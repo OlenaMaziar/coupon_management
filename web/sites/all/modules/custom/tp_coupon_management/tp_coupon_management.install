@@ -1,0 +1,64 @@
+<?php
+
+/**
+ * Implements hook_schema().
+ *
+ * @ingroup tp_coupon_management
+ */
+function tp_coupon_management_schema() {
+  $schema = array();
+
+  $schema['tp_coupon_management_coupon'] = array(
+    'description' => 'The base table for our coupon entity.',
+    'fields' => array(
+      'coupon_id' => array(
+        'description' => 'Primary key of the coupon entity.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'bundle_type' => array(
+        'description' => 'The bundle type',
+        'type' => 'text',
+        'size' => 'medium',
+        'not null' => TRUE,
+      ),
+      'coupon_code' => array(
+        'description' => 'A code of the coupon',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'discount_percentage' => array(
+        'description' => 'A percentage of the coupon',
+        'type' => 'float',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'coupon_description' => array(
+        'description' => 'A description of the item',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'status' => array(
+        'description' => 'The status of the coupon.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'primary key' => array('coupon_id'),
+  );
+
+  return $schema;
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function tp_coupon_management_uninstall() {
+  field_attach_delete_bundle('tp_coupon_management_coupon', 'coupon_bundle');
+}
